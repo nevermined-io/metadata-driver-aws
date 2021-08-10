@@ -5,69 +5,64 @@
 
 from setuptools import setup, find_packages
 
-with open('README.md') as readme_file:
+with open("README.md") as readme_file:
     readme = readme_file.read()
 
-with open('CHANGELOG.md') as history_file:
+with open("CHANGELOG.md") as history_file:
     history = history_file.read()
 
 # Installed by pip install metadata-driver-aws
 # or pip install -e .
 install_requirements = [
-    'coloredlogs',
-    'boto3 == 1.8.7',
-    'PyYAML>=4.2b1',
-    'nevermined-metadata-driver-interface==0.1.0',
+    "coloredlogs>=15.0.1",
+    "boto3>=1.18.15",
+    "PyYAML>=5.4.1",
+    "nevermined-metadata-driver-interface==0.2.0",
 ]
 
 # Required to run setup.py:
-setup_requirements = ['pytest-runner', ]
-
-test_requirements = [
-    'codacy-coverage',
-    'coverage',
-    'pylint',
-    'pytest',
-    'pytest-watch',
-    'tox',
+setup_requirements = [
+    "pytest-runner",
 ]
+
+test_requirements = ["pytest>=6.2.4"]
 
 # Possibly required by developers of metadata-driver-aws:
 dev_requirements = [
-    'bumpversion',
-    'pkginfo',
-    'twine',
-    'watchdog',
+    "bumpversion",
+    "pkginfo",
+    "twine",
+    "watchdog",
 ]
 
 setup(
     author="nevermined-io",
-    author_email='root@nevermined.io',
+    author_email="root@nevermined.io",
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: Apache Software License',
-        'Natural Language :: English',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
+        "Development Status :: 2 - Pre-Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Apache Software License",
+        "Natural Language :: English",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
     ],
     description="💧 Metadata S3 Driver Implementation",
     extras_require={
-        'test': test_requirements,
-        'dev': dev_requirements + test_requirements,
+        "test": test_requirements,
+        "dev": dev_requirements + test_requirements,
     },
     install_requires=install_requirements,
     license="Apache Software License 2.0",
     long_description=readme,
     long_description_content_type="text/markdown",
     include_package_data=True,
-    keywords='nevermined-metadata-driver-aws',
-    name='nevermined-metadata-driver-aws',
-    packages=find_packages(include=['metadata_driver_aws']),
+    keywords="nevermined-metadata-driver-aws",
+    name="nevermined-metadata-driver-aws",
+    packages=find_packages(include=["metadata_driver_aws"]),
     setup_requires=setup_requirements,
-    test_suite='tests',
+    test_suite="tests",
     tests_require=test_requirements,
-    url='https://github.com/nevermined-io/metadata-driver-aws',
-    version='0.1.0',
+    url="https://github.com/nevermined-io/metadata-driver-aws",
+    version="0.2.0",
     zip_safe=False,
 )

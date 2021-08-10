@@ -1,75 +1,43 @@
-import logging
-import pytest
-import sys
 import time
 from filecmp import cmp
 
-from metadata_driver_interface.exceptions import DriverError
 from metadata_driver_aws.data_plugin import Plugin
 
-################################### SETUP LOGGING! ###################################
-loggers_dict = logging.Logger.manager.loggerDict
 
-logger = logging.getLogger()
-logger.handlers = []
-
-# Set level
-logger.setLevel(logging.DEBUG)
-
-# Create formatter
-FORMAT = "%(asctime)s - %(levelno)s - %(module)-15s - %(funcName)-15s - %(message)s"
-# FORMAT = "%(asctime)s L%(levelno)s: %(message)s"
-
-DATE_FMT = "%Y-%m-%d %H:%M:%S"
-formatter = logging.Formatter(FORMAT, DATE_FMT)
-
-# Create handler and assign
-handler = logging.StreamHandler(sys.stderr)
-handler.setFormatter(formatter)
-logger.handlers = [handler]
-logger.debug("Started logging in test module".format())
-
-
-################################### SETUP LOGGING! ###################################
-
-@pytest.mark.xfail(raises=DriverError)
-def test_complete():
+def test_complete(aws_plugin, test_file_path):
     # Create folder, upload file, list files, download file, delete file
-    # TODO: Add finally to clean s3 bucket
-
-    config = dict()  #
-    s3_plugin = Plugin(config)
 
     # Create bucket
-    bucket_name = f'metadata-driver-aws-data-plugin-{int(time.time())}'
-    print(f'Test bucket: {bucket_name}')
-    s3_plugin.create_directory(f's3://{bucket_name}/test')
+    bucket_name = f"metadata-driver-aws-data-plugin-{int(time.time())}"
+    print(f"Test bucket: {bucket_name}")
+    aws_plugin.create_directory(f"s3://{bucket_name}/test")
 
     # List buckets
-    buckets = s3_plugin.list_buckets()
+    buckets = aws_plugin.list_buckets()
     print("Buckets")
     for i, b in enumerate(buckets):
-        print('\t', i, b)
+        print("\t", i, b)
 
     # Upload a file
-    s3_plugin.upload('./LICENSE', f's3://{bucket_name}/test/LICENSE')
-    files = s3_plugin.list(f's3://{bucket_name}/test/')
-    print(f'Files in bucket {bucket_name}')
-    for i, f in enumerate(files):
-        print('\t', f)
-    assert len(files) == 2  # /test and /test/LICENSE
-    assert files[0]['Key'] == 'test/'
-    assert files[1]['Key'] == 'test/LICENSE'
+    aws_plugin.upload(test_file_path, f"s3://{bucket_name}/test/TEST.md")
+    files = aws_plugin.list(f"s3://{bucket_name}/test/")
+    assert len(files) == 1
+    assert files[0] == "test/TEST.md"
+
+    # Get presigned_url
+    sign_url = aws_plugin.generate_url(f"s3://{bucket_name}/test/TEST.md")
+    assert sign_url.startswith(f"http://localhost:9000/{bucket_name}/test/TEST.md")
 
     # Download a file
-    s3_plugin.download(f's3://{bucket_name}/test/LICENSE', '/tmp/test_driver_aws_data_plugin_license')
-    assert cmp('./LICENSE', '/tmp/test_driver_aws_plugin_license')
+    aws_plugin.download(
+        f"s3://{bucket_name}/test/TEST.md", "/tmp/test_driver_aws_data_plugin"
+    )
+    assert cmp(test_file_path, "/tmp/test_driver_aws_data_plugin")
 
     # Delete the file
-    s3_plugin.delete(f's3://{bucket_name}/test/LICENSE')
-    files = s3_plugin.list(f's3://{bucket_name}/test/')
-    assert len(files) == 1
-    assert files[0]['Key'] == 'test/'
+    aws_plugin.delete(f"s3://{bucket_name}/test/TEST.md")
+    files = aws_plugin.list(f"s3://{bucket_name}/test/")
+    assert len(files) == 0
 
     # Delete the bucket
-    s3_plugin.delete_bucket(bucket_name)
+    aws_plugin.delete_bucket(bucket_name)
