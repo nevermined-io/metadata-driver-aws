@@ -25,7 +25,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Start minio
       run: |
-        docker run -p 9000:9000 minio/minio server ./data
+        docker run -d -p 9000:9000 minio/minio server ./data
         sleep 10
     - name: Install dependencies
       run: |
