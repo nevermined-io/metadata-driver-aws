@@ -6,6 +6,8 @@ from metadata_driver_interface.data_plugin import AbstractPlugin
 from metadata_driver_interface.exceptions import DriverError
 
 from metadata_driver_aws.log import setup_logging
+from metadata_driver_aws.s3_client import get_s3_instance
+
 
 setup_logging()
 
@@ -21,25 +23,16 @@ class Plugin(AbstractPlugin):
         Args:
              config(dict): Configuration options
         """
-        # configuration dictionary not needed at this current state
-        # assert config, "Must specify a configuration dictionary"
-
-        # Logging for this class
-        self.logger = logging.getLogger('Plugin')
-
         # The S3 client object
-        self.s3_client = boto3.client('s3')
-        self.aws_region = self.s3_client.meta.config.region_name
-
-        # The S# resource object
-        self.s3_resource = boto3.resource('s3')
-
-        self.logger.debug("Created a new S3 plugin object in region: {}".format(self.aws_region))
+        s3_instance = get_s3_instance(config)
+        self.driver = s3_instance.s3_resource
+        self.sign_client = s3_instance.s3_client
+        self.logger = logging.getLogger(__name__)
 
     @property
     def type(self):
         """str: the type of this plugin (``'AWS'``)"""
-        return 'AWS'
+        return "AWS"
 
     @staticmethod
     def validate_s3_path(path):
@@ -48,7 +41,7 @@ class Plugin(AbstractPlugin):
              path(str): The path to check.
         Raises:
             :exc:`~..DriverError`: if the file is not uploaded correctly."""
-        return path.startswith('s3://')
+        return path.startswith("s3://")
 
     def parse_s3_path(self, path):
         """Validate a path if it represents correctly a S3 path
@@ -57,14 +50,16 @@ class Plugin(AbstractPlugin):
         Raises:
             :exc:`~..DriverError`: if the file is not uploaded correctly."""
         if self.validate_s3_path(path):
-            bucket = path[5:].split('/', 1)[0]
+            bucket = path[5:].split("/", 1)[0]
             try:
-                path = path[5:].split('/', 1)[1]
+                path = path[5:].split("/", 1)[1]
             except IndexError:
-                path = ''
+                path = ""
             return bucket, path
         else:
-            self.logger.error(f"Path {path} must be a s3 url (format s3://my_bucket/my_file)")
+            self.logger.error(
+                f"Path {path} must be a s3 url (format s3://my_bucket/my_file)"
+            )
             raise DriverError
 
     @staticmethod
@@ -74,15 +69,15 @@ class Plugin(AbstractPlugin):
              path(str): The path to check.
         Raises:
             :exc:`~..DriverError`: if the file is not uploaded correctly."""
-        return not path.startswith('s3://')
+        return not path.startswith("s3://")
 
     def upload(self, local_file, remote_file):
         """Upload file to a remote resource manager
-         Args:
-             local_file(str): The path of the file to upload.
-             remote_file(str): The path of the resource manager where the file is going to be allocated.
-         Raises:
-             :exc:`~..DriverError`: if the file is not uploaded correctly.
+        Args:
+            local_file(str): The path of the file to upload.
+            remote_file(str): The path of the resource manager where the file is going to be allocated.
+        Raises:
+            :exc:`~..DriverError`: if the file is not uploaded correctly.
 
         """
         self.copy(local_file, remote_file)
@@ -112,69 +107,64 @@ class Plugin(AbstractPlugin):
 
         bucket, path = self.parse_s3_path(remote_folder)
         try:
-            paginator = self.s3_client.get_paginator('list_objects_v2')
-            page_iterator = paginator.paginate(Bucket=bucket, Delimiter='/', Prefix=path)
-            return page_iterator.build_full_result()['Contents']
+            bucket_s3 = self.driver.Bucket(bucket)
+            objects = bucket_s3.objects.filter(Prefix=path)
+            result = [o.key for o in objects]
+            return result
         except Exception as e:
             raise DriverError
 
     def list_buckets(self):
-        response = self.s3_client.list_buckets()
-        logging.debug("Found {} buckets".format(len(response['Buckets'])))
+        bucket_iterator = self.driver.buckets.all()
 
-        for bucket in response['Buckets']:
-            print(bucket['Name'])
-            # print(bucket.name)
+        # extract only the name of the bucket
+        bucket_names = [b.name for b in bucket_iterator]
+        logging.debug(f"Found {bucket_names} buckets")
 
-        return response['Buckets']
+        return bucket_names
 
     def copy(self, source_path: str, dest_path: str):
         """Copy file from a path to another path.
-         Args:
-             source_path(str): The path of the file to be copied.
-             dest_path(str): The destination path where the file is going to be allocated.
-         Raises:
-             :exc:`~..DriverError`: if the file is not uploaded correctly.
+        Args:
+            source_path(str): The path of the file to be copied.
+            dest_path(str): The destination path where the file is going to be allocated.
+        Raises:
+            :exc:`~..DriverError`: if the file is not uploaded correctly.
         """
-        # XOR Check
-        # if source_path.startswith('s3://') != dest_path.startswith('s3://'):
-        #     self.logger.error("Either local or remote file must be a s3 url and the other must be a local reference")
-        #     raise DriverError
-        if not (source_path.startswith('s3://') or dest_path.startswith('s3://')):
+        if not (source_path.startswith("s3://") or dest_path.startswith("s3://")):
             self.logger.error(
-                "Source or destination must be a s3 url (format s3://my_bucket/my_file)")
+                "Source or destination must be a s3 url (format s3://my_bucket/my_file)"
+            )
             raise DriverError
-        if source_path.startswith('s3://') and dest_path.startswith('s3://'):
+        if source_path.startswith("s3://") and dest_path.startswith("s3://"):
             self.logger.error("Source or destination must be a local directory")
             raise DriverError
 
         # Check if resources exists and can read
-        if source_path.startswith('s3://'):
-            bucket = source_path[5:].split('/', 1)[0]
-            path = source_path[5:].split('/', 1)[1]
+        if source_path.startswith("s3://"):
+            bucket = source_path[5:].split("/", 1)[0]
+            path = source_path[5:].split("/", 1)[1]
             try:
-                # src_file = self.s3.Object(bucket, path).load()
-                self.s3_resource.meta.client.download_file(bucket, path, dest_path)
+                bucket_s3 = self.driver.Bucket(bucket)
+                bucket_s3.download_file(path, dest_path)
             except botocore.exceptions.ClientError as e:
-                if e.response['Error']['Code'] == "404":
-                    self.logger.error(f"Source file {path} in bucket {bucket} not found")
+                if e.response["Error"]["Code"] == "404":
+                    self.logger.error(
+                        f"Source file {path} in bucket {bucket} not found"
+                    )
                     raise DriverError
-                # else:
-                #     if not os.path.isfile(source_path):
-                #         self.logger.error(f"Source file {source_path} not found or cannot be read")
-                #         raise DriverError
 
-        elif dest_path.startswith('s3://'):
-            bucket = dest_path[5:].split('/', 1)[0]
-            path = dest_path[5:].split('/', 1)[1]
+        elif dest_path.startswith("s3://"):
+            bucket = dest_path[5:].split("/", 1)[0]
+            path = dest_path[5:].split("/", 1)[1]
             try:
-                # self.s3meta.meta.client.head_bucket(Bucket=bucket)
-                self.s3_resource.meta.client.upload_file(source_path, bucket, path)
+                bucket_s3 = self.driver.Bucket(bucket)
+                bucket_s3.upload_file(source_path, path)
             except botocore.exceptions.ClientError:
-                # self.logger.error("The destination bucket {} does not exist or you have no access".format(bucket))
                 self.logger.error(
                     f"There were a problem uploading local file {source_path}. Please check file exists and bucket "
-                    f"{bucket} is accesible")
+                    f"{bucket} is accesible"
+                )
 
     def generate_url(self, remote_file):
         """Generate a signed url that give access for a period of time to the resource
@@ -184,15 +174,10 @@ class Plugin(AbstractPlugin):
              :exc:`~..DriverError`: if the file does not exist or if the action could not be done.
         """
         bucket, path = self.parse_s3_path(remote_file)
-        region = self.s3_client.get_bucket_location(Bucket=bucket)['LocationConstraint']
-        sign_client = boto3.client('s3', region_name=region)
-        url = sign_client.generate_presigned_url(
-            ClientMethod='get_object',
-            Params={
-                'Bucket': bucket,
-                'Key': path
-            },
-            ExpiresIn=3600 * 24  # 1day
+        url = self.sign_client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={"Bucket": bucket, "Key": path},
+            ExpiresIn=3600 * 24,  # 1day
         )
         return url
 
@@ -205,8 +190,10 @@ class Plugin(AbstractPlugin):
         """
 
         bucket, path = self.parse_s3_path(remote_file)
+        delete = {"Objects": [{"Key": path}]}
         try:
-            self.s3_client.delete_object(Bucket=bucket, Key=path)
+            bucket_s3 = self.driver.Bucket(bucket)
+            bucket_s3.delete_objects(Delete=delete)
         except Exception as e:
             raise DriverError
         self.logger.debug("Deleted {} from {}".format(path, bucket))
@@ -223,19 +210,13 @@ class Plugin(AbstractPlugin):
              :exc:`~..DriverError`
         """
         try:
-            self.s3_resource.meta.client.head_bucket(Bucket=bucket)
-        except botocore.exceptions.ClientError:
-            try:
-                # if self.location == 'us-east-1':
-                #    self.s3.create_bucket(Bucket=bucket)
-                # else:
-                self.s3_client.create_bucket(Bucket=bucket,
-                                             CreateBucketConfiguration={
-                                                 'LocationConstraint': self.aws_region})
-            except Exception:
-                logging.error(f"Error creating bucket {bucket} in region {self.aws_region}")
-                raise DriverError
+            bucket = self.driver.create_bucket(Bucket=bucket)
+        except Exception:
+            logging.error("Error creating bucket %s", bucket)
+            raise DriverError(f"Error creating bucket {bucket}")
         self.logger.debug("Created bucket {}".format(bucket))
+
+        return bucket
 
     def delete_bucket(self, bucket_name):
         """Delete a bucket in S3
@@ -245,29 +226,14 @@ class Plugin(AbstractPlugin):
              :exc:`~..DriverError`
         """
         try:
-            self.s3_resource.meta.client.head_bucket(Bucket=bucket_name)
-            bucket = self.s3_resource.Bucket(bucket_name)
+            bucket = self.driver.Bucket(bucket_name)
             for key in bucket.objects.all():
                 key.delete()
             bucket.delete()
         except Exception:
-            logging.error(f"Error deleting bucket {bucket_name} in region {self.location}")
+            logging.error(f"Error deleting bucket {bucket_name}")
             raise DriverError
         self.logger.debug("Deleted bucket {}".format(bucket_name))
-
-    def list_buckets(self):
-        """List the S3 buckets
-        Args:
-            bucket_name(str): The name of the bucket
-        Raises:
-             :exc:`~..DriverError`
-        """
-        try:
-            response = self.s3_client.list_buckets()
-            return response['Buckets']
-        except Exception:
-            self.logger.error(f"Error listing buckets")
-            raise DriverError
 
     def create_directory(self, remote_folder):
         """Create a directory in S3
@@ -277,13 +243,13 @@ class Plugin(AbstractPlugin):
              :exc:`~..DriverError`: if the directory already exists.
         """
         bucket, path = self.parse_s3_path(remote_folder)
-        if bucket == '' or path == '':
+        if bucket == "" or path == "":
             self.logger.error("Remote folder can not be empty")
             raise DriverError
-        path = path + '/' if not path.endswith('/') else path
+        path = path + "/" if not path.endswith("/") else path
         try:
-            self.create_bucket(bucket)
-            self.s3_client.put_object(Bucket=bucket, Body='', Key=path)
+            bucket = self.create_bucket(bucket)
+            bucket.put_object(Body="", Key=path)
         except Exception:
             raise DriverError
 
