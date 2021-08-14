@@ -1,3 +1,5 @@
+import configparser
+from metadata_driver_aws.config_parser import parse_config
 from pathlib import Path
 
 import pytest
@@ -8,7 +10,8 @@ from metadata_driver_aws.data_plugin import Plugin
 @pytest.fixture
 def aws_plugin():
     config_path = Path(__file__).parent / "resources/config.ini"
-    return Plugin(config_path.as_posix())
+    config = parse_config(config_path.as_posix(), "metadata-driver")
+    return Plugin(config)
 
 
 @pytest.fixture
