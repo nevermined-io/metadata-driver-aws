@@ -1,31 +1,29 @@
 import boto3
-from botocore.config import Config
 from metadatadb_driver_interface.utils import get_value
 from metadata_driver_interface.exceptions import DriverError
-
-from metadata_driver_aws.config_parser import parse_config
 
 
 _S3_INSTANCE = None
 
 
-def get_s3_instance(config_file=None):
+def get_s3_instance(config=None):
     global _S3_INSTANCE
     if _S3_INSTANCE is None:
-        _S3_INSTANCE = S3Instance(config_file)
+        _S3_INSTANCE = S3Instance(config)
 
     return _S3_INSTANCE
 
 
 class S3Instance:
-    def __init__(self, config_file=None):
-        config = parse_config(config_file, "aws")
-        aws_access_key = get_value("access_key", "AWS_ACCESS_KEY_ID", None, config)
+    def __init__(self, config=None):
+        aws_access_key = get_value("aws.access_key", "AWS_ACCESS_KEY_ID", None, config)
         aws_secret_access_key = get_value(
-            "secret_access_key", "AWS_SECRET_ACCESS_KEY", None, config
+            "aws.secret_access_key", "AWS_SECRET_ACCESS_KEY", None, config
         )
-        default_region = get_value("default_region", "AWS_DEFAULT_REGION", None, config)
-        endpoint_url = get_value("endpoint_url", "AWS_ENDPOINT_URL", None, config)
+        default_region = get_value(
+            "aws.default_region", "AWS_DEFAULT_REGION", None, config
+        )
+        endpoint_url = get_value("aws.endpoint_url", "AWS_ENDPOINT_URL", None, config)
 
         if aws_access_key is None:
             raise DriverError(
