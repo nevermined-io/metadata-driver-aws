@@ -17,7 +17,7 @@ install_requirements = [
     "coloredlogs>=15.0.1",
     "boto3>=1.18.15",
     "PyYAML>=5.4.1",
-    "nevermined-metadata-driver-interface==0.2.0",
+    "nevermined-metadata-driver-interface>=0.4.0",
 ]
 
 # Required to run setup.py:
@@ -39,12 +39,12 @@ setup(
     author="nevermined-io",
     author_email="root@nevermined.io",
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: Apache Software License",
-        "Natural Language :: English",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: Apache Software License',
+        'Natural Language :: English',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
     description="💧 Metadata S3 Driver Implementation",
     extras_require={
@@ -63,6 +63,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/nevermined-io/metadata-driver-aws",
-    version="0.2.1",
+    version="0.3.0",
     zip_safe=False,
 )
