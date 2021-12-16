@@ -1,4 +1,6 @@
 import logging
+import os
+import tempfile
 
 import boto3
 import botocore
@@ -83,6 +85,22 @@ class Plugin(AbstractPlugin):
         self.copy(local_file, remote_file)
         self.logger.debug("Uploaded {} to {}".format(local_file, remote_file))
 
+    def upload_bytes(self, content, remote_file):
+        """Uploads bytes to a remote resource manager
+         Args:
+             content(bytes): The bytes to upload
+            remote_file(str): The path of the resource manager where the file is going to be allocated.
+         Raises:
+             :exc:`~..DriverError`: if the file is not uploaded correctly.
+
+        """
+        f = tempfile.NamedTemporaryFile()
+        f.write(content)
+        f.flush()
+        self.copy(f.name, remote_file)
+        f.close()
+        self.logger.debug("Uploaded content to {}".format(remote_file))
+
     def download(self, remote_file, local_file):
         """Download file from a remote resource manager
         Args:
@@ -93,6 +111,22 @@ class Plugin(AbstractPlugin):
         """
         self.copy(remote_file, local_file)
         self.logger.debug("Downloaded {} to {}".format(remote_file, local_file))
+
+    def download_bytes(self, remote_file):
+        """Download a remote content and returned in the shape of bytes
+        Args:
+             remote_file(str): The path in the resource manager of the file to download from.
+        Raises:
+             :exc:`~..DriverError`: if the file is not downloaded correctly.
+        """
+        with tempfile.NamedTemporaryFile(delete=False) as local_file:
+            self.copy(remote_file, local_file.name)
+            self.logger.debug("Downloaded {} to {}".format(remote_file, local_file.name))
+            f = open(local_file.name, "rb")
+            content = f.read()
+            os.remove(local_file.name)
+
+            return content
 
     def list(self, remote_folder):
         """List all the files of a cloud directory.
